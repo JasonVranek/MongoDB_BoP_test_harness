@@ -1,0 +1,210 @@
+CS232 MongoDB + Box of Pain project
+Jason Vranek
+
+Box of Pain - Peter Alvaro and Daniel Bittman
+
+Purpose of Repo:
+Given a distributed system, unit testing isn't enough to cover all of the possible bugs outside of basic software mistakes.
+It is necessary to understand your system's faults before production as mistakes cost money. It is difficult to build
+an exhaustive set of system level tests given the number of edge cases. 
+
+Problems in a distributed system boil down to partial failures. A robust sstem should be able to smoothly continue
+operation despite some degree of partial failture. The difficult part with reasoning about partial failure is that
+any node in the system is never sure whether a message hasn't arrived yet due to latency, or if it will never arrive at all.
+The problem then of identifying a distributed system's robustness to partial failure can be reduced to evalutating its
+performance when communication between nodes is tampered with. 
+
+Box of Pain differs from other fault injectors because it first traces the partial order of all communication events
+by working at the syscall level. It can also simulate a partial failure by creating artificial faults in the 
+communication between nodes. This is much easier than injecting process specific faults to cause partial failure.
+An example usage would be injecting faults to cease communication between processes A and B. This can assess the 
+inter-process robustness between the processes given this fault. If there are any system-wide effects from this fault,
+then the developer can focus their debugging efforts at this spot.
+
+This repo provides a reusable test harness for running BoP traces on MongoDB benchmarks. Traces can be used to inject
+guided faults and potentially uncover partial failure bugs that break Mongo's ACID guarantees. Below is a summary of the
+steps to get the YCSB benchmarks and MongoDB setup before invoking the Box of Pain on it. YCSB provides a 
+convenient way to run benchmarks that can easily be configured. At the bottom of the page is a setup and usage example. 
+I recommend following this and then referring to the summary if there are problems.
+
+
+
+
+
+Setting up YCSB source (https://scalegrid.io/blog/how-to-benchmark-mongodb-with-ycsb/):
+
+Install necessary dependencies:
+	- sudo apt install maven
+	- sudo apt install default-jdk
+	- sudo apt install git
+
+Download and build latest release of YCSB:
+	- git clone git://github.com/brianfrankcooper/YCSB.git
+	- cd YCSB
+Build the source with the mongoDB binding
+	- mvn -pl com.yahoo.ycsb:mongodb-binding -am clean package
+	- mvn -pl com.yahoo.ycsb:mongodb-binding -am clean install
+
+
+Download and install MongoDB (https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/#install-mongodb-community-edition-using-deb-packages)
+	- sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4
+	- echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+	- sudo apt update
+	- sudo apt install -y mongodb-org
+
+
+MongoDB install info:
+	Data directory installed to /var/lib/mongodb
+	log directory installed to /var/log/mongodb
+	config file at: /etc/mongodb.conf
+
+
+Configuring the MongoDB instance:
+- The point of this project is to use BoP to be able to reason about and trace a distributed system.
+This means that I need to configure the MongoDB instance to run with at least 3 instances, i.e a primary
+and two replicas. (https://www.tutorialkart.com/mongodb/setup-mongodb-replica-set/):
+
+Make the directories to run the replicas
+	- sudo mkdir /var/lib/mongodb1
+	- sudo mkdir /var/lib/mongodb2
+
+Start the primary mongoDB instance (port 27017):
+	- sudo mongod --port 27017 --dbpath /var/lib/mongodb --replSet rs0
+
+Start the first replica (port 27018):
+	- sudo mongod --port 27018 --dbpath /var/lib/mongodb1 --replSet rs0
+
+Start the second replica (port 27019):
+	- sudo mongod --port 27019 --dbpath /var/lib/mongodb2 --replSet rs0
+
+Edit the Mongo js script that runs when shell is opened (this allows for replicas to read):
+	- echo "rs.slaveOk()" > ~/.mongorc.js
+
+Open the mongo shell for the primary:
+	- mongo
+
+Add Mongo instance to Replica Set:
+	- rs.add("localhost:27018")
+	- rs.add("localhost:27019")
+
+Start replication:
+	- rs.initiate()
+
+Confirm replicas were added to the repica set:
+	- rs.status()
+
+Connect to the MongoDB primary:
+	- mongo
+	- mongo --port 27018    (secondary)
+	- mongo --port 27019	(secondary)
+
+Note: It may be necessary to open the mongo shells for each of the secondaries. 
+This will cause rs.slaveOk() to run in each secondary shell as that has been added to the ~/.mongorc.js file.
+
+
+Running a benchmark on the replica set:
+	- ./run_benchmark.sh
+
+This will run the mongodb benchmark as described in the params.dat file. It will output two files: outLoad.txt and outRun.txt
+These files contain the benchmark results from loading the data into the tables and operating on the table. 
+
+Modifying the benchmark:
+	- params.dat contains all of the parameters that control the benchmark. More details on how to configure this file can be
+	found in the comments within params.dat and at (https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties)
+
+Running BoP (single trace):
+	- cd YCSB && ./bin/box-of-pain/painbox -d -e './bin/ycsb,load,mongodb,-s,-P,../params.dat' -e './bin/ycsb,run,mongodb,-s,-P,../params.dat' -s my_trace.boprun > my_trace_results.txt
+
+Turn the trace output to a pdf:
+	- m4 my_trace.boprun.m4 > my_trace.boprun.dot && dot -Tpdf -o my_trace.boprun.pdf my_trace.boprun.dot
+
+Collecting multiple Traces:
+	- python collect_traces.py <output_name> <number_of_traces>
+
+This script will create number_of_traces directories and output the results of each trace into each folder. After completion, each folder
+will contain: 
+	- <output_name>.boprun
+	- <output_name>.boprun.dot
+	- <output_name>.boprun.inc
+	- <output_name>.boprun.m4
+	- <output_name>.boprun.pdf
+	- <output_name>_results.txt		(results of the benchmark test)
+	- params.dat 					(A copy of the params used for this trace)
+
+
+
+
+
+
+
+
+TLDR Installation:
+Step 1: install mongo and YCSB (one time install)
+	- sudo ./install_mong_bench.sh
+
+Step 2: start mongo instances
+	- ./start_mongo.sh
+
+Step 3: Configure the replica set (one time configure)
+	- mongo  							(open primary shell)
+	- rs.add("localhost:27018")			(add to replica set)
+	- rs.add("localhost:27019")			(add to replica set)
+	- rs.initiate()						(initiate replica set)
+	- rs.status()						(confirm the replicas are part of the output)
+
+Step 4: Run a benchmark to confirm installation was correct:
+	- ./run_benchmark.sh
+	- less outLoad.txt
+	- less outRun.txt
+
+Step 5: Setup BoxofPain (Note I didn't add this to the install script since I'm unsure if you want BoP on Github yet)
+(Also note that my scripts call BoP from the YCSB/bin directory)
+	- cd YCSB/bin
+	- git clone <bop_url>
+	- cd box-of-pain
+	- make
+
+
+
+TLDR Collecting traces:
+Step 1: start mongo instances
+	- ./start_mongo.sh
+
+Step 2: collect traces
+	- python collect_traces.py <output_name> <number_of_traces>
+
+
+
+Example:
+	- ./start_mongo.sh
+	- python collect_traces.py my_trace 3
+
+This will call BoP 3 times on the benchmark specified in params.dat
+It will create 3 directories containing these files:
+
+my_trace0/	
+	- my_trace0.boprun
+	- my_trace0.boprun.dot
+	- my_trace0.boprun.inc
+	- my_trace0.boprun.m4
+	- my_trace0.boprun.pdf
+	- my_trace0_results.txt			(results of the benchmark test)
+	- params.dat 					(A copy of the params used for this trace)
+
+my_trace1
+	- my_trace1.boprun
+	- my_trace1.boprun.dot
+	- my_trace1.boprun.inc
+	- my_trace1.boprun.m4
+	- my_trace1.boprun.pdf
+	- my_trace1_results.txt			(results of the benchmark test)
+	- params.dat 					(A copy of the params used for this trace)
+
+mytrace_2
+	- mytrace_2.boprun
+	- mytrace_2.boprun.dot
+	- mytrace_2.boprun.inc
+	- mytrace_2.boprun.m4
+	- mytrace_2.boprun.pdf
+	- my_trace2_results.txt			(results of the benchmark test)
+	- params.dat 					(A copy of the params used for this trace)
