@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Install dependencies
+sudo apt update
 sudo apt install build-essentials
+sudo apt install python
 sudo apt install maven
 sudo apt install default-jdk
 sudo apt install git
@@ -24,5 +26,6 @@ sudo apt install -y mongodb-org
 sudo mkdir /var/lib/mongodb1
 sudo mkdir /var/lib/mongodb2
 
+# Edit the mongorc.js file to run replicas as slaves
 echo "rs.slaveOk()" > ~/.mongorc.js
 
