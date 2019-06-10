@@ -8,10 +8,10 @@ Given a distributed system, unit testing isn't enough to cover all of the possib
 It is necessary to understand your system's faults before production as mistakes cost money. It is difficult to build
 an exhaustive set of system level tests given the number of edge cases. 
 
-Problems in a distributed system boil down to partial failures. A robust sstem should be able to smoothly continue
+Problems in a distributed system boil down to partial failures. A robust system should be able to smoothly continue
 operation despite some degree of partial failture. The difficult part with reasoning about partial failure is that
 any node in the system is never sure whether a message hasn't arrived yet due to latency, or if it will never arrive at all.
-The problem then of identifying a distributed system's robustness to partial failure can be reduced to evalutating its
+The problem then of identifying a distributed system's robustness to partial failure can be reduced to evaluating its
 performance when communication between nodes is tampered with. 
 
 Box of Pain differs from other fault injectors because it first traces the partial order of all communication events
@@ -83,12 +83,12 @@ Edit the Mongo js script that runs when shell is opened (this allows for replica
 Open the mongo shell for the primary:
 	- mongo
 
+Start replication:
+	- rs.initiate()
+
 Add Mongo instance to Replica Set:
 	- rs.add("localhost:27018")
 	- rs.add("localhost:27019")
-
-Start replication:
-	- rs.initiate()
 
 Confirm replicas were added to the repica set:
 	- rs.status()
@@ -143,13 +143,13 @@ Step 1: install mongo and YCSB (one time install)
 	- sudo ./install_mong_bench.sh
 
 Step 2: start mongo instances
-	- ./start_mongo.sh
+	- sudo ./start_mongo.sh
 
 Step 3: Configure the replica set (one time configure)
 	- mongo  							(open primary shell)
+	- rs.initiate()						(initiate replica set)
 	- rs.add("localhost:27018")			(add to replica set)
 	- rs.add("localhost:27019")			(add to replica set)
-	- rs.initiate()						(initiate replica set)
 	- rs.status()						(confirm the replicas are part of the output)
 
 Step 4: Run a benchmark to confirm installation was correct:
@@ -168,7 +168,7 @@ Step 5: Setup BoxofPain (Note I didn't add this to the install script since I'm 
 
 TLDR Collecting traces:
 Step 1: start mongo instances
-	- ./start_mongo.sh
+	- sudo ./start_mongo.sh
 
 Step 2: collect traces
 	- python collect_traces.py <output_name> <number_of_traces>
@@ -176,7 +176,7 @@ Step 2: collect traces
 
 
 Example:
-	- ./start_mongo.sh
+	- sudo ./start_mongo.sh
 	- python collect_traces.py my_trace 3
 
 This will call BoP 3 times on the benchmark specified in params.dat

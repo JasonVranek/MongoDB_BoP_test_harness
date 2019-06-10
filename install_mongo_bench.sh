@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Install dependencies
+sudo apt install build-essentials
 sudo apt install maven
 sudo apt install default-jdk
 sudo apt install git
