@@ -2,7 +2,7 @@
 
 # Install dependencies
 sudo apt update
-sudo apt install build-essentials
+sudo apt install build-essential
 sudo apt install python
 sudo apt install maven
 sudo apt install default-jdk

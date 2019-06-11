@@ -140,12 +140,13 @@ will contain:
 
 TLDR Installation:
 Step 1: install mongo and YCSB (one time install)
-	- sudo ./install_mong_bench.sh
+	- sudo ./install_mongo_bench.sh
 
 Step 2: start mongo instances
 	- sudo ./start_mongo.sh
 
 Step 3: Configure the replica set (one time configure)
+	- open a new terminal
 	- mongo  							(open primary shell)
 	- rs.initiate()						(initiate replica set)
 	- rs.add("localhost:27018")			(add to replica set)
